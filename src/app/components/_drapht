@@ -1,0 +1,875 @@
+"use client"
+
+import { useState, useRef, useEffect } from 'react'
+import { Provider } from 'react-redux'
+import { configureStore, createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { useSelector, useDispatch } from 'react-redux'
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { GitBranch, Send, Plus, Eye, Code, FolderOpen, GitFork, LogIn, Paperclip, FolderTree, Settings, File, Folder, ChevronRight, ChevronDown, RefreshCw, Loader2, History, Search, X } from 'lucide-react'
+
+// Global styles for scrollbars
+const globalStyles = `
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #4a4a4a #1e1e1e;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: #1e1e1e;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: #4a4a4a;
+    border-radius: 4px;
+    border: 2px solid #1e1e1e;
+  }
+`
+
+// Redux slice
+const appSlice = createSlice({
+  name: 'app',
+  initialState: {
+    input: '',
+    messages: [],
+    generatedCode: '',
+    gitBranch: '',
+    commitMessage: '',
+    splitPosition: 50,
+    projects: [
+      { id: 1, name: 'Default Project', description: 'Initial project', messages: [], createdAt: new Date('2023-05-01').toISOString() },
+      { id: 2, name: 'Project 2', description: 'Second project', messages: [{ role: 'assistant', content: 'Welcome to Project 2!' }], createdAt: new Date('2023-05-15').toISOString() },
+      { id: 3, name: 'Project 3', description: 'Third project', messages: [{ role: 'user', content: 'Create a login form' }, { role: 'assistant', content: 'Here\'s a basic login form:...' }], createdAt: new Date('2023-06-02').toISOString() },
+      { id: 4, name: 'Project 4', description: 'Fourth project', messages: [], createdAt: new Date('2023-06-10').toISOString() },
+      { id: 5, name: 'Project 5', description: 'Fifth project', messages: [], createdAt: new Date('2023-07-01').toISOString() },
+    ],
+    activeProject: 1,
+    isLoggedIn: false,
+    gitProjects: [],
+    isProjectStructureOpen: false,
+    selectedFile: null,
+    isGitPushing: false,
+    isProjectHistoryOpen: false,
+    projectSearchQuery: '',
+    isNewProjectModalOpen: false,
+    newProjectName: '',
+    newProjectDescription: '',
+    isCreatingProject: false,
+  },
+  reducers: {
+    setInput: (state, action: PayloadAction<string>) => {
+      state.input = action.payload
+    },
+    addMessage: (state, action: PayloadAction<{ role: string; content: string }>) => {
+      state.messages.push(action.payload)
+    },
+    setGeneratedCode: (state, action: PayloadAction<string>) => {
+      state.generatedCode = action.payload
+    },
+    setGitBranch: (state, action: PayloadAction<string>) => {
+      state.gitBranch = action.payload
+    },
+    setCommitMessage: (state, action: PayloadAction<string>) => {
+      state.commitMessage = action.payload
+    },
+    setSplitPosition: (state, action: PayloadAction<number>) => {
+      state.splitPosition = action.payload
+    },
+    addProject: (state, action: PayloadAction<{ name: string; description: string }>) => {
+      const newProject = {
+        id: state.projects.length + 1,
+        name: action.payload.name,
+        description: action.payload.description,
+        messages: [],
+        createdAt: new Date().toISOString(),
+      }
+      state.projects.push(newProject)
+      state.activeProject = newProject.id
+    },
+    setActiveProject: (state, action: PayloadAction<number>) => {
+      state.activeProject = action.payload
+    },
+    updateProjectMessages: (state, action: PayloadAction<{ projectId: number; messages: Array<{ role: string; content: string }> }>) => {
+      const project = state.projects.find(p => p.id === action.payload.projectId)
+      if (project) {
+        project.messages = action.payload.messages
+      }
+    },
+    setIsLoggedIn: (state, action: PayloadAction<boolean>) => {
+      state.isLoggedIn = action.payload
+    },
+    setGitProjects: (state, action: PayloadAction<string[]>) => {
+      state.gitProjects = action.payload
+    },
+    setIsProjectStructureOpen: (state, action: PayloadAction<boolean>) => {
+      state.isProjectStructureOpen = action.payload
+    },
+    setSelectedFile: (state, action: PayloadAction<{ name: string; content: string } | null>) => {
+      state.selectedFile = action.payload
+    },
+    setIsGitPushing: (state, action: PayloadAction<boolean>) => {
+      state.isGitPushing = action.payload
+    },
+    setIsProjectHistoryOpen: (state, action: PayloadAction<boolean>) => {
+      state.isProjectHistoryOpen = action.payload
+    },
+    setProjectSearchQuery: (state, action: PayloadAction<string>) => {
+      state.projectSearchQuery = action.payload
+    },
+    setIsNewProjectModalOpen: (state, action: PayloadAction<boolean>) => {
+      state.isNewProjectModalOpen = action.payload
+    },
+    setNewProjectName: (state, action: PayloadAction<string>) => {
+      state.newProjectName = action.payload
+    },
+    setNewProjectDescription: (state, action: PayloadAction<string>) => {
+      state.newProjectDescription = action.payload
+    },
+    setIsCreatingProject: (state, action: PayloadAction<boolean>) => {
+      state.isCreatingProject = action.payload
+    },
+  },
+})
+
+export const {
+  setInput,
+  addMessage,
+  setGeneratedCode,
+  setGitBranch,
+  setCommitMessage,
+  setSplitPosition,
+  addProject,
+  setActiveProject,
+  updateProjectMessages,
+  setIsLoggedIn,
+  setGitProjects,
+  setIsProjectStructureOpen,
+  setSelectedFile,
+  setIsGitPushing,
+  setIsProjectHistoryOpen,
+  setProjectSearchQuery,
+  setIsNewProjectModalOpen,
+  setNewProjectName,
+  setNewProjectDescription,
+  setIsCreatingProject,
+} = appSlice.actions
+
+const store = configureStore({
+  reducer: appSlice.reducer,
+})
+
+type RootState = ReturnType<typeof store.getState>
+
+// Custom Input component
+const CustomInput = ({ value, onChange, placeholder, className, ...props }) => (
+  <input
+    type="text"
+    value={value}
+    onChange={onChange}
+    placeholder={placeholder}
+    className={`w-full bg-[#1e1e1e] text-gray-100 border border-[#3a3a3a] rounded-md px-3 py-2 focus:outline-none focus:border-[#00e676] focus:ring-1 focus:ring-[#00e676] focus:ring-opacity-30 placeholder-gray-500 ${className}`}
+    {...props}
+  />
+)
+
+// Custom SearchInput component
+const SearchInput = ({ value, onChange, placeholder, className, ...props }) => (
+  <div className="relative">
+    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+    <input
+      type="text"
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`w-full bg-[#1e1e1e] text-gray-100 border border-[#3a3a3a] rounded-md pl-10 pr-3 py-2 focus:outline-none focus:border-[#00e676] focus:ring-1 focus:ring-[#00e676] focus:ring-opacity-30 placeholder-gray-500 ${className}`}
+      {...props}
+    />
+  </div>
+)
+
+// Custom Textarea component with dynamic height
+const CustomTextarea = ({ value, onChange, placeholder, className, ...props }) => {
+  const textareaRef = useRef(null)
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }, [value])
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`w-full bg-[#1e1e1e] text-gray-100 border border-[#3a3a3a] rounded-md px-4 py-3 focus:outline-none focus:border-[#00e676] focus:ring-1 focus:ring-[#00e676] focus:ring-opacity-30 placeholder-gray-500 resize-none overflow-hidden ${className}`}
+      style={{
+        minHeight: '120px',
+        maxHeight: '300px',
+        overflowY: 'auto',
+      }}
+      {...props}
+    />
+  )
+}
+
+const FileTreeItem = ({ item, level = 0, onSelectFile, selectedFile }) => {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const toggleOpen = (e) => {
+    e.stopPropagation()
+    if (item.type === 'folder') {
+      setIsOpen(!isOpen)
+    }
+  }
+
+  const handleItemClick = () => {
+    if (item.type === 'file') {
+      onSelectFile(item)
+    }
+  }
+
+  const isSelected = selectedFile && selectedFile.name === item.name
+
+  return (
+    <div>
+      <div
+        className={`flex items-center py-2 px-4 cursor-pointer transition-colors ${
+          isSelected
+            ? 'bg-[#2a2a2a] text-[#00e676]'
+            : 'hover:bg-[#2a2a2a] text-gray-100'
+        }`}
+        style={{ paddingLeft: `${level * 16 + 16}px` }}
+        onClick={handleItemClick}
+      >
+        {item.type === 'folder' && (
+          <span onClick={toggleOpen} className="mr-2">
+            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </span>
+        )}
+        {item.type === 'folder' ? (
+          <Folder className="h-4 w-4 mr-2 text-[#00e676]" />
+        ) : (
+          <File className="h-4 w-4 mr-2 text-gray-400" />
+        )}
+        <span>{item.name}</span>
+      </div>
+      {item.type === 'folder' && isOpen && (
+        <div>
+          {item.children.map((child, index) => (
+            <FileTreeItem
+              key={index}
+              item={child}
+              level={level + 1}
+              onSelectFile={onSelectFile}
+              selectedFile={selectedFile}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NewProjectModal() {
+  const dispatch = useDispatch()
+  const { isNewProjectModalOpen, newProjectName, newProjectDescription, isCreatingProject } = useSelector((state: RootState) => state)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newProjectName.trim()) {
+      dispatch(setIsCreatingProject(true))
+      // Simulate project creation delay
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      dispatch(addProject({ name: newProjectName, description: newProjectDescription }))
+      dispatch(setIsNewProjectModalOpen(false))
+      dispatch(setNewProjectName(''))
+      dispatch(setNewProjectDescription(''))
+      dispatch(setIsCreatingProject(false))
+    }
+  }
+
+  return (
+    <dialog
+      id="newProjectModal"
+      className="bg-[#1a1a1a] text-gray-100 rounded-lg p-6 w-[400px]"
+      open={isNewProjectModalOpen}
+    >
+      <h3 className="text-xl font-semibold mb-4 text-[#00e676]">Create New Project</h3>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="projectName" className="block text-sm font-medium mb-1">Project Name</label>
+          <CustomInput
+            id="projectName"
+            value={newProjectName}
+            onChange={(e) => dispatch(setNewProjectName(e.target.value))}
+            placeholder="Enter project name"
+          />
+        </div>
+        <div>
+          <label htmlFor="projectDescription" className="block text-sm font-medium mb-1">Project Description</label>
+          <CustomTextarea
+            id="projectDescription"
+            value={newProjectDescription}
+            onChange={(e) => dispatch(setNewProjectDescription(e.target.value))}
+            placeholder="Enter a short description of your project"
+          />
+        </div>
+        <div className="flex justify-end space-x-2">
+          <Button
+            onClick={() => dispatch(setIsNewProjectModalOpen(false))}
+            variant="outline"
+            className="border-[#444] bg-[#2a2a2a] hover:bg-[#3a3a3a]"
+            disabled={isCreatingProject}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            className="bg-[#00e676] hover:bg-[#00c853] text-[#121212]"
+            disabled={isCreatingProject}
+          >
+            {isCreatingProject ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Project'
+            )}
+          </Button>
+        </div>
+      </form>
+    </dialog>
+  )
+}
+
+function App() {
+  const dispatch = useDispatch()
+  const {
+    input,
+    messages,
+    generatedCode,
+    gitBranch,
+    commitMessage,
+    splitPosition,
+    projects,
+    activeProject,
+    isLoggedIn,
+    gitProjects,
+    isProjectStructureOpen,
+    selectedFile,
+    isGitPushing,
+    isProjectHistoryOpen,
+    projectSearchQuery,
+  } = useSelector((state: RootState) => state)
+
+  const splitRef = useRef(null)
+  const iframeRef = useRef(null)
+
+  const projectStructure = {
+    type: 'folder',
+    name: 'project-root',
+    children: [
+      {
+        type: 'folder',
+        name: 'src',
+        children: [
+          {
+            type: 'folder',
+            name: 'components',
+            children: [
+              { type: 'file', name: 'Header.tsx', content: 'export const Header = () => { return <header>...</header> }' },
+              { type: 'file', name: 'Footer.tsx', content: 'export const Footer = () => { return <footer>...</footer> }' },
+            ],
+          },
+          {
+            type: 'folder',
+            name: 'pages',
+            children: [
+              { type: 'file', name: 'index.tsx', content: 'export default function Home() { return <div>Home Page</div> }' },
+              { type: 'file', name: 'about.tsx', content: 'export default function About() { return <div>About Page</div> }' },
+            ],
+          },
+          { type: 'file', name: 'App.tsx', content: 'import React from "react"; ...' },
+        ],
+      },
+      { type: 'file', name: 'package.json', content: '{ "name": "my-project", "version": "1.0.0", ... }' },
+      { type: 'file', name: 'tsconfig.json', content: '{ "compilerOptions": { ... } }' },
+    ],
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (input.trim()) {
+      dispatch(addMessage({ role: 'user', content: input }))
+      // Simulate AI response
+      setTimeout(() => {
+        const aiResponse = { role: 'assistant', content: `Generating code for: "${input}"` }
+        dispatch(addMessage(aiResponse))
+        dispatch(setGeneratedCode(`// Generated code based on: ${input}\n\nfunction ${input.replace(/\s+/g, '')}() {\n  // Implementation goes here\n  console.log("Function created based on natural language input");\n}\n\n${input.replace(/\s+/g, '')}();`))
+      }, 1000)
+      dispatch(setInput(''))
+    }
+  }
+
+  const handleGitPush = () => {
+    dispatch(setIsGitPushing(true))
+    // Simulate Git push
+    console.log(`Pushing to branch: ${gitBranch}`)
+    console.log(`Commit message: ${commitMessage}`)
+    console.log(`Code to push: ${generatedCode}`)
+    // Simulate a delay for the Git push operation
+    setTimeout(() => {
+      dispatch(setIsGitPushing(false))
+      // Here you would typically call an API to handle the actual Git operations
+      const modal = document.getElementById('gitModal')
+      if (modal instanceof HTMLDialogElement) {
+        modal.close()
+      }
+      // Reset the form
+      dispatch(setGitBranch(''))
+      dispatch(setCommitMessage(''))
+    }, 3000)
+  }
+
+  const handleMouseDown = (e) => {
+    e.preventDefault()
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleMouseMove = (e) => {
+    if (splitRef.current) {
+      const newPosition = (e.clientX / splitRef.current.offsetWidth) * 100
+      dispatch(setSplitPosition(newPosition))
+    }
+  }
+
+  const handleMouseUp = () => {
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleNewProject = () => {
+    dispatch(setIsNewProjectModalOpen(true))
+    const modal = document.getElementById('newProjectModal')
+    if (modal instanceof HTMLDialogElement) {
+      modal.showModal()
+    }
+  }
+
+  const handleSwitchProject = () => {
+    dispatch(setIsProjectHistoryOpen(true))
+  }
+
+  const selectProject = (projectId) => {
+    dispatch(setActiveProject(projectId))
+    dispatch(setIsProjectHistoryOpen(false))
+  }
+
+  const handleGitLogin = () => {
+    // Simulate Git login
+    dispatch(setIsLoggedIn(true))
+    // In a real app, you'd implement OAuth flow here
+    dispatch(setGitProjects(['Project A', 'Project B', 'Project C'])) // Simulated Git projects
+  }
+
+  const handleImportFromGit = (projectName) => {
+    // Simulate importing a project from Git
+    dispatch(addProject({ name: projectName, description: 'Imported from Git' }))
+    dispatch(addMessage({ role: 'assistant', content: `Project "${projectName}" imported from Git successfully.` }))
+    dispatch(setGeneratedCode('// Imported code from Git project'))
+    // In a real app, you'd fetch the actual project data from Git here
+    const modal = document.getElementById('gitImportModal')
+    if (modal instanceof HTMLDialogElement) {
+      modal.close()
+    }
+  }
+
+  const handleSelectFile = (file) => {
+    dispatch(setSelectedFile(file))
+  }
+
+  const handleConfirmFileSelection = () => {
+    if (selectedFile) {
+      const newCode = `// File: ${selectedFile.name}\n${selectedFile.content}`
+      dispatch(setGeneratedCode(prevCode => prevCode + '\n\n' + newCode))
+      dispatch(addMessage({ role: 'system', content: `Loaded file: ${selectedFile.name}` }))
+      dispatch(setSelectedFile(null))
+    }
+  }
+
+  const handleRefreshPreview = () => {
+    if (iframeRef.current) {
+      iframeRef.current.src = iframeRef.current.src
+    }
+  }
+
+  const filteredProjects = projects.filter(project =>
+    project.name.toLowerCase().includes(projectSearchQuery.toLowerCase())
+  )
+
+  const groupedProjects = filteredProjects.reduce((acc, project) => {
+    const month = new Date(project.createdAt).toLocaleString('default', { month: 'long', year: 'numeric' })
+    if (!acc[month]) {
+      acc[month] = []
+    }
+    acc[month].push(project)
+    return acc
+  }, {})
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
+  return (
+    <>
+      <style>{globalStyles}</style>
+      <div className="min-h-screen bg-[#121212] text-gray-100 flex flex-col">
+        <header className="flex justify-between items-center p-4 border-b border-[#2a2a2a]">
+          <h1 className="text-sm font-medium text-gray-400">Drapht</h1>
+          <div className="flex items-center space-x-4">
+            <Button 
+              variant="outline"
+              size="icon" 
+              className="text-gray-300 border-[#2a2a2a] bg-[#1a1a1a] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors"
+              onClick={handleSwitchProject}
+            >
+              <History className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline"
+              className="text-gray-300 border-[#2a2a2a] bg-[#1a1a1a] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors"
+              onClick={handleNewProject}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+            {isLoggedIn ? (
+              <Button 
+                variant="outline"
+                className="text-gray-300 border-[#2a2a2a] bg-[#1a1a1a] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors"
+                onClick={() => {
+                  const modal = document.getElementById('gitImportModal')
+                  if (modal instanceof HTMLDialogElement) {
+                    modal.showModal()
+                  }
+                }}
+              >
+                <GitFork className="h-4 w-4 mr-2" />
+                Import from Git
+              </Button>
+            ) : (
+              <Button 
+                className="bg-[#00e676] hover:bg-[#00c853] text-[#121212] transition-colors"
+                onClick={handleGitLogin}
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Login with Git
+              </Button>
+            )}
+          </div>
+        </header>
+
+        <div className="flex-1 flex relative" ref={splitRef}>
+          <div className="absolute inset-0 flex">
+            <div style={{ width: `${splitPosition}%` }} className="h-full">
+              <div className="h-full p-4 flex flex-col">
+                <h2 className="text-sm font-medium mb-4 text-gray-400">
+                  {projects.find(p => p.id === activeProject)?.name}
+                </h2>
+                <ScrollArea className="flex-1 pr-4 mb-4">
+                  {messages.map((message, index) => (
+                    <div key={index} className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+                      <div className={`inline-block p-3 rounded-lg ${message.role === 'user' ? 'bg-[#3a3a3a]' : 'bg-[#2a2a2a]'}`}>
+                        {message.content}
+                      </div>
+                    </div>
+                  ))}
+                </ScrollArea>
+                <form onSubmit={handleSubmit} className="w-full">
+                  <CustomTextarea
+                    value={input}
+                    onChange={(e) => dispatch(setInput(e.target.value))}
+                    placeholder="Describe your code in natural language..."
+                    className="w-full min-h-[80px] mb-2"
+                  />
+                  <div className="flex items-center justify-between">
+                    <TooltipProvider>
+                      <div className="flex space-x-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className="text-gray-300 border-[#3a3a3a] bg-[#1e1e1e] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors">
+                              <Paperclip className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Attach file</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="text-gray-300 border-[#3a3a3a] bg-[#1e1e1e] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors"
+                              onClick={() => dispatch(setIsProjectStructureOpen(!isProjectStructureOpen))}
+                            >
+                              <FolderTree className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Project structure</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className="text-gray-300 border-[#3a3a3a] bg-[#1e1e1e] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors">
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Settings</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
+                    <Button type="submit" className="bg-[#00e676] hover:bg-[#00c853] text-[#121212] transition-colors">
+                      <Send className="h-4 w-4 mr-2" />
+                      Send
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div
+              className="w-2 bg-[#2a2a2a] cursor-col-resize hover:bg-[#00e676] transition-colors"
+              onMouseDown={handleMouseDown}
+            />
+            <div style={{ width: `${100 - splitPosition}%` }} className="h-full flex">
+              {isProjectStructureOpen && (
+                <div className="w-64 bg-[#1a1a1a] border-r border-[#2a2a2a] overflow-hidden flex flex-col">
+                  <div className="p-4 flex-1 overflow-auto">
+                    <h3 className="text-lg font-semibold mb-2 text-[#00e676]">Project Structure</h3>
+                    <ScrollArea className="h-[calc(100vh-12rem)]">
+                      <FileTreeItem
+                        item={projectStructure}
+                        onSelectFile={handleSelectFile}
+                        selectedFile={selectedFile}
+                      />
+                    </ScrollArea>
+                  </div>
+                  <div className="p-4 border-t border-[#2a2a2a] bg-[#1a1a1a] sticky bottom-0">
+                    <Button
+                      onClick={handleConfirmFileSelection}
+                      disabled={!selectedFile}
+                      className="w-full bg-[#00e676] hover:bg-[#00c853] text-[#121212]"
+                    >
+                      Confirm Selection
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="flex-1">
+                <Tabs defaultValue="preview" className="flex-1 flex flex-col h-full">
+                  <div className="flex justify-between items-center p-4 border-b border-[#2a2a2a]">
+                    <TabsList className="bg-[#1a1a1a]">
+                      <TabsTrigger value="preview" className="data-[state=active]:bg-[#2a2a2a] data-[state=active]:text-[#00e676]">
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview
+                      </TabsTrigger>
+                      <TabsTrigger value="code" className="data-[state=active]:bg-[#2a2a2a] data-[state=active]:text-[#00e676]">
+                        <Code className="h-4 w-4 mr-2" />
+                        Code
+                      </TabsTrigger>
+                    </TabsList>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-gray-300 border-[#2a2a2a] bg-[#1a1a1a] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors"
+                      onClick={() => {
+                        const modal = document.getElementById('gitModal')
+                        if (modal instanceof HTMLDialogElement) {
+                          modal.showModal()
+                        }
+                      }}
+                    >
+                      <GitBranch className="h-4 w-4 mr-2" />
+                      Git Push
+                    </Button>
+                  </div>
+                  <TabsContent value="preview" className="flex-1 bg-[#1a1a1a] p-4 overflow-hidden">
+                    <div className="bg-[#2a2a2a] p-4 rounded-md h-full flex flex-col">
+                      <div className="flex justify-between items-center text-sm text-gray-400 mb-2">
+                        <span>Preview (localhost:3000)</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleRefreshPreview}
+                          className="text-gray-300 border-[#3a3a3a] bg-[#1e1e1e] hover:bg-[#2a2a2a] hover:text-[#00e676] transition-colors"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <iframe
+                        ref={iframeRef}
+                        src="http://localhost:3000"
+                        className="w-full flex-1 border border-[#3a3a3a] rounded"
+                        title="Local Preview"
+                      />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="code" className="flex-1 bg-[#1a1a1a] p-4 overflow-auto">
+                    <pre className="text-gray-300 whitespace-pre-wrap">
+                      <code>{generatedCode}</code>
+                    </pre>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <dialog id="gitModal" className="bg-[#1a1a1a] text-gray-100 rounded-lg p-6 w-96">
+          <h3 className="text-xl font-semibold mb-4 text-[#00e676]">Git Integration</h3>
+          <form method="dialog" className="space-y-4">
+            <div>
+              <label htmlFor="gitBranch" className="block text-sm font-medium mb-1">Branch Name</label>
+              <CustomInput
+                id="gitBranch"
+                value={gitBranch}
+                onChange={(e) => dispatch(setGitBranch(e.target.value))}
+                placeholder="Enter branch name"
+              />
+            </div>
+            <div>
+              <label htmlFor="commitMessage" className="block text-sm font-medium mb-1">Commit Message</label>
+              <CustomInput
+                id="commitMessage"
+                value={commitMessage}
+                onChange={(e) => dispatch(setCommitMessage(e.target.value))}
+                placeholder="Enter commit message"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button 
+                onClick={() => {
+                  const modal = document.getElementById('gitModal')
+                  if (modal instanceof HTMLDialogElement) {
+                    modal.close()
+                  }
+                }} 
+                variant="outline" 
+                className="border-[#444] bg-[#2a2a2a] hover:bg-[#3a3a3a]"
+                disabled={isGitPushing}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleGitPush} 
+                className="bg-[#00e676] hover:bg-[#00c853] text-[#121212]"
+                disabled={isGitPushing}
+              >
+                {isGitPushing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Pushing...
+                  </>
+                ) : (
+                  <>
+                    <GitBranch className="mr-2 h-4 w-4" />
+                    Push to Git
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog id="gitImportModal" className="bg-[#1a1a1a] text-gray-100 rounded-lg p-6 w-96">
+          <h3 className="text-xl font-semibold mb-4 text-[#00e676]">Import from Git</h3>
+          <div className="space-y-4">
+            {gitProjects.map((project, index) => (
+              <Button
+                key={index}
+                onClick={() => handleImportFromGit(project)}
+                className="w-full bg-[#2a2a2a] hover:bg-[#3a3a3a] text-gray-100 justify-start"
+              >
+                <GitFork className="h-4 w-4 mr-2" />
+                {project}
+              </Button>
+            ))}
+            <Button onClick={() => {
+              const modal = document.getElementById('gitImportModal')
+              if (modal instanceof HTMLDialogElement) {
+                modal.close()
+              }
+            }} variant="outline" className="w-full border-[#444] bg-[#2a2a2a] hover:bg-[#3a3a3a] text-gray-300">
+              Cancel
+            </Button>
+          </div>
+        </dialog>
+
+        {isProjectHistoryOpen && (
+          <div className="fixed inset-y-0 right-0 w-80 bg-[#1a1a1a] border-l border-[#2a2a2a] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-[#2a2a2a] flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-[#00e676]">Project History</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => dispatch(setIsProjectHistoryOpen(false))}
+                className="text-gray-400 hover:text-[#00e676] hover:bg-[#2a2a2a] rounded-full transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 border-b border-[#2a2a2a]">
+              <SearchInput
+                placeholder="Search projects..."
+                value={projectSearchQuery}
+                onChange={(e) => dispatch(setProjectSearchQuery(e.target.value))}
+              />
+            </div>
+            <ScrollArea className="flex-1 px-4">
+              {Object.entries(groupedProjects).map(([month, monthProjects]) => (
+                <div key={month} className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-400 px-4 py-2 sticky top-0 bg-[#1a1a1a]">{month}</h4>
+                  {monthProjects.map((project) => (
+                    <Button
+                      key={project.id}
+                      onClick={() => selectProject(project.id)}
+                      className="w-full bg-[#2a2a2a] hover:bg-[#3a3a3a] text-gray-100 justify-start px-4 py-2 mb-2"
+                    >
+                      <Folder className="h-4 w-4 mr-2" />
+                      {project.name}
+                    </Button>
+                  ))}
+                </div>
+              ))}
+            </ScrollArea>
+          </div>
+        )}
+
+        <NewProjectModal />
+      </div>
+    </>
+  )
+}
+
+export function Drapht() {
+  return (
+    <Provider store={store}>
+      <App />
+    </Provider>
+  )
+}
